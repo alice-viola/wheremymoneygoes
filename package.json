@@ -1,0 +1,47 @@
+{
+  "name": "wheremymoneygoes",
+  "version": "1.0.0",
+  "main": "src/server/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server/index.js",
+    "start": "node src/server/index.js",
+    "setup": "node setup-database.js",
+    "migrate": "node src/migrations/run.js",
+    "migrate:reset": " node reset-migrations.js && node src/migrations/run.js",
+    "setup:complete": "node setup-database.js && node src/migrations/run.js",
+    "clear-data": "node clear-encrypted-data.js"
+  },
+  "keywords": [
+    "finance",
+    "expense-tracking",
+    "ai-categorization"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "AI-powered financial transaction categorization system",
+  "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/jwt": "^7.2.4",
+    "@fastify/multipart": "^8.1.0",
+    "@fastify/postgres": "^5.2.2",
+    "@fastify/rate-limit": "^8.1.1",
+    "@fastify/static": "^6.12.0",
+    "@fastify/websocket": "^8.3.1",
+    "agentnet": "^0.1.31",
+    "bcrypt": "^5.1.1",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.26.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "pino": "^8.19.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "nodemon": "^3.1.0",
+    "pino-pretty": "^10.3.1"
+  }
+}
