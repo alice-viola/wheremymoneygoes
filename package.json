@@ -1,11 +1,17 @@
 {
   "name": "wheremymoneygoes",
   "version": "1.0.0",
-  "main": "src/server/index.js",
+  "main": "electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "node src/server/index.js",
+    "dev:web": "cd src/app && npm run dev",
+    "dev:electron": "concurrently \"npm run dev:web\" \"wait-on tcp:5173 tcp:5174 tcp:5175 tcp:5176 && NODE_ENV=development electron .\"",
     "start": "node src/server/index.js",
+    "start:electron": "electron .",
+    "build:web": "cd src/app && npm run build",
+    "build:electron": "npm run build:web && electron-builder",
+    "dist": "npm run build:electron",
     "setup": "node setup-database.js",
     "migrate": "node src/migrations/run.js",
     "migrate:reset": " node reset-migrations.js && node src/migrations/run.js",
@@ -37,11 +43,55 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3",
     "pino": "^8.19.0",
+    "sqlite3": "^5.1.7",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
-    "nodemon": "^3.1.0",
-    "pino-pretty": "^10.3.1"
+    "@electron/rebuild": "^4.0.1",
+    "@types/node": "^22.18.8",
+    "concurrently": "^9.2.1",
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.12",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.6.2",
+    "keytar": "^7.9.0",
+    "nodemon": "^3.1.10",
+    "pino-pretty": "^10.3.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.wheremymoneygoes.app",
+    "productName": "WhereMyMoneyGoes",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/electron/**/*",
+      "!src/**/*",
+      "!node_modules/electron/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "assets/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Finance",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "wheremymoneygoes",
+      "repo": "wheremymoneygoes-releases"
+    }
   }
 }
