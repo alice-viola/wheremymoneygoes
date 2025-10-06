@@ -498,7 +498,7 @@ const saveAccount = async () => {
 
 const setAsDefault = async (account) => {
   try {
-    await accountsStore.setDefaultAccount(userStore.userId, account.id)
+    await accountsStore.setDefaultAccount(account.id)
     toast.success(`${account.accountName} is now the default account`)
   } catch (error) {
     toast.error('Failed to set default account')
@@ -518,7 +518,6 @@ const deleteAccount = async () => {
   
   try {
     await accountsStore.deleteAccount(
-      userStore.userId,
       accountToDelete.value.id,
       deleteTransactions.value
     )

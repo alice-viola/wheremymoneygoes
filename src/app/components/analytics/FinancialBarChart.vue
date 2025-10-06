@@ -1,6 +1,6 @@
 <template>
   <div class="chart-container" :style="{ height: `${height}px` }">
-    <Line
+    <Bar
       :data="chartData"
       :options="chartOptions"
     />
@@ -9,28 +9,24 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Line } from 'vue-chartjs'
+import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 } from 'chart.js'
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 )
 
 const props = defineProps({
@@ -41,29 +37,26 @@ const props = defineProps({
   height: {
     type: Number,
     default: 300
+  },
+  stacked: {
+    type: Boolean,
+    default: false
+  },
+  horizontal: {
+    type: Boolean,
+    default: false
   }
 })
 
 const chartData = computed(() => props.data)
 
-const chartOptions = {
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  indexAxis: props.horizontal ? 'y' : 'x',
   interaction: {
     mode: 'index',
     intersect: false
-  },
-  elements: {
-    line: {
-      tension: 0, // Straight lines for financial data
-      borderWidth: 2
-    },
-    point: {
-      radius: 4,
-      hoverRadius: 6,
-      backgroundColor: 'white',
-      borderWidth: 2
-    }
   },
   plugins: {
     legend: {
@@ -80,7 +73,7 @@ const chartOptions = {
       callbacks: {
         label: (context) => {
           const label = context.dataset.label || ''
-          const value = context.parsed.y || 0
+          const value = context.parsed[props.horizontal ? 'x' : 'y'] || 0
           return `${label}: €${value.toFixed(2)}`
         }
       }
@@ -88,20 +81,35 @@ const chartOptions = {
   },
   scales: {
     x: {
+      stacked: props.stacked,
       grid: {
-        display: false
-      }
-    },
-    y: {
-      beginAtZero: true,
-      grid: {
+        display: !props.horizontal,
         color: 'rgba(0, 0, 0, 0.05)',
         drawBorder: false
       },
-      ticks: {
+      ticks: props.horizontal ? {
         callback: (value) => `€${value}`
-      }
+      } : {}
+    },
+    y: {
+      stacked: props.stacked,
+      beginAtZero: true,
+      grid: {
+        display: props.horizontal,
+        color: 'rgba(0, 0, 0, 0.05)',
+        drawBorder: false
+      },
+      ticks: !props.horizontal ? {
+        callback: (value) => `€${value}`
+      } : {}
     }
   }
-}
+}))
 </script>
+
+<style scoped>
+.chart-container {
+  position: relative;
+  width: 100%;
+}
+</style>

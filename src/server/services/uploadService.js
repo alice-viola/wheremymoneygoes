@@ -227,6 +227,7 @@ class UploadService {
                             uuidv4(),
                             userId,
                             uploadId,
+                            accountId,
                             lineNumber++,
                             JSON.stringify(encryptedLine),
                             false

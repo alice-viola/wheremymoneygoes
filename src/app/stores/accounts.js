@@ -230,27 +230,27 @@ export const useAccountsStore = defineStore('accounts', {
     },
 
     // Set default account
-    async setDefaultAccount(userId, accountId) {
-      this.isLoading = true
-      this.error = null
-      
-      try {
-        await apiClient.post(`/api/accounts/${accountId}/set-default`, { userId })
+    async setDefaultAccount(accountId) {
+        this.isLoading = true
+        this.error = null
         
-        // Update local state
-        this.accounts.forEach(a => {
-          a.isDefault = a.id === accountId
-        })
-        this.defaultAccountId = accountId
-        
-        return true
-      } catch (error) {
-        this.error = error.message
-        console.error('Failed to set default account:', error)
-        throw error
-      } finally {
-        this.isLoading = false
-      }
+        try {
+            await apiClient.post(`/api/accounts/${accountId}/set-default`)
+            
+            // Update local state
+            this.accounts.forEach(a => {
+                a.isDefault = a.id === accountId
+            })
+            this.defaultAccountId = accountId
+            
+            return true
+        } catch (error) {
+            this.error = error.message
+            console.error('Failed to set default account:', error)
+            throw error
+        } finally {
+            this.isLoading = false
+        }
     },
 
     // Initialize store from localStorage

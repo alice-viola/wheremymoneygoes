@@ -175,8 +175,8 @@ export default async function accountRoutes(fastify, options) {
      * Create new account
      */
     fastify.post('/', async (request, reply) => {
+        const userId = request.user.id; // Get userId from authenticated user
         const {
-            userId,
             accountName,
             accountType = 'checking',
             bankName,
@@ -188,9 +188,9 @@ export default async function accountRoutes(fastify, options) {
             balance = 0
         } = request.body;
 
-        if (!userId || !accountName) {
+        if (!accountName) {
             return reply.code(400).send({
-                error: 'userId and accountName are required'
+                error: 'accountName is required'
             });
         }
 
@@ -280,9 +280,9 @@ export default async function accountRoutes(fastify, options) {
      * Update account
      */
     fastify.patch('/:accountId', async (request, reply) => {
+        const userId = request.user.id; // Get userId from authenticated user
         const { accountId } = request.params;
         const {
-            userId,
             accountName,
             accountType,
             bankName,
@@ -294,12 +294,6 @@ export default async function accountRoutes(fastify, options) {
             isDefault,
             balance
         } = request.body;
-
-        if (!userId) {
-            return reply.code(400).send({
-                error: 'userId is required'
-            });
-        }
 
         const client = await pool.connect();
         try {
@@ -444,14 +438,12 @@ export default async function accountRoutes(fastify, options) {
      * Delete account
      */
     fastify.delete('/:accountId', async (request, reply) => {
+        const userId = request.user.id; // Get userId from authenticated user
         const { accountId } = request.params;
-        const { userId, deleteTransactions = false } = request.body;
+        const { deleteTransactions = false } = request.body;
 
-        if (!userId) {
-            return reply.code(400).send({
-                error: 'userId is required'
-            });
-        }
+        // Debug logging
+        fastify.log.info(`Delete account request - accountId: ${accountId}, userId: ${userId}`);
 
         const client = await pool.connect();
         try {
@@ -463,8 +455,23 @@ export default async function accountRoutes(fastify, options) {
                 [accountId, userId]
             );
 
+            fastify.log.info(`Account check result - found: ${accountCheck.rows.length} rows`);
+
             if (accountCheck.rows.length === 0) {
                 await client.query('ROLLBACK');
+                
+                // Additional debug: check if account exists at all
+                const accountExists = await client.query(
+                    'SELECT id, user_id FROM wheremymoneygoes.accounts WHERE id = $1',
+                    [accountId]
+                );
+                
+                if (accountExists.rows.length > 0) {
+                    fastify.log.error(`Account ${accountId} exists but belongs to user ${accountExists.rows[0].user_id}, not ${userId}`);
+                } else {
+                    fastify.log.error(`Account ${accountId} does not exist`);
+                }
+                
                 return reply.code(404).send({
                     error: 'Account not found or access denied'
                 });
@@ -546,14 +553,8 @@ export default async function accountRoutes(fastify, options) {
      * Set default account
      */
     fastify.post('/:accountId/set-default', async (request, reply) => {
+        const userId = request.user.id; // Get userId from authenticated user
         const { accountId } = request.params;
-        const { userId } = request.body;
-
-        if (!userId) {
-            return reply.code(400).send({
-                error: 'userId is required'
-            });
-        }
 
         const client = await pool.connect();
         try {

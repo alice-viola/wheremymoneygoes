@@ -168,7 +168,7 @@
         </div>
         
         <div v-if="trendChartData" class="relative">
-          <TrendLineChart :data="trendChartData" :height="300" />
+          <StepLineChart :data="trendChartData" :height="300" :fillArea="true" />
           
           <!-- Trend Summary -->
           <div class="mt-4 grid grid-cols-2 gap-4">
@@ -314,6 +314,7 @@ import { useAnalyticsStore } from '@/stores/analytics'
 import { formatCurrency, getCategoryColor } from '@/utils/formatters'
 import CategoryPieChart from '@/components/analytics/CategoryPieChart.vue'
 import TrendLineChart from '@/components/analytics/TrendLineChart.vue'
+import StepLineChart from '@/components/analytics/StepLineChart.vue'
 
 const userStore = useUserStore()
 const analyticsStore = useAnalyticsStore()

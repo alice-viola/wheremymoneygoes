@@ -121,6 +121,16 @@
           Income vs Expenses
         </h2>
         <div class="flex items-center space-x-4">
+          <!-- Chart Type Selector -->
+          <select
+            v-model="chartType"
+            @change="updateChart"
+            class="text-sm border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-gray-300"
+          >
+            <option value="line">Line Chart</option>
+            <option value="step">Step Chart</option>
+            <option value="bar">Bar Chart</option>
+          </select>
           <label class="flex items-center">
             <input
               type="checkbox"
@@ -151,9 +161,10 @@
         </div>
       </div>
       
-      <TrendLineChart
+      <component
         v-if="chartData"
-        :key="`chart-${selectedCategory}-${selectedMerchant}-${trends.length}`"
+        :is="currentChartComponent"
+        :key="`chart-${chartType}-${selectedCategory}-${selectedMerchant}-${trends.length}`"
         :data="chartData"
         :height="400"
       />
@@ -321,6 +332,8 @@ import { useUserStore } from '@/stores/user'
 import { useAnalyticsStore } from '@/stores/analytics'
 import { formatCurrency, formatDate, getCategoryColor } from '@/utils/formatters'
 import TrendLineChart from '@/components/analytics/TrendLineChart.vue'
+import StepLineChart from '@/components/analytics/StepLineChart.vue'
+import FinancialBarChart from '@/components/analytics/FinancialBarChart.vue'
 import MerchantCategorySelector from '@/components/filters/MerchantCategorySelector.vue'
 import DatePicker from '@/components/filters/DatePicker.vue'
 import { useToast } from 'vue-toastification'
@@ -335,6 +348,7 @@ const selectedRange = ref('90d')
 const showIncome = ref(true)
 const showExpenses = ref(true)
 const showNetFlow = ref(false)
+const chartType = ref('step') // Default to step chart for financial data
 const trends = ref([])
 const categoryTrends = ref([])
 const selectedCategory = ref('')
@@ -408,8 +422,7 @@ const chartData = computed(() => {
       label: 'Income',
       data: trends.value.map(t => t.income),
       borderColor: '#22c55e',
-      backgroundColor: 'rgba(34, 197, 94, 0.1)',
-      tension: 0.4
+      backgroundColor: chartType.value === 'bar' ? '#22c55e' : 'rgba(34, 197, 94, 0.1)'
     })
   }
   
@@ -418,8 +431,7 @@ const chartData = computed(() => {
       label: 'Expenses',
       data: trends.value.map(t => t.expenses),
       borderColor: '#ef4444',
-      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-      tension: 0.4
+      backgroundColor: chartType.value === 'bar' ? '#ef4444' : 'rgba(239, 68, 68, 0.1)'
     })
   }
   
@@ -428,8 +440,7 @@ const chartData = computed(() => {
       label: 'Net Flow',
       data: trends.value.map(t => t.netFlow),
       borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-      tension: 0.4
+      backgroundColor: chartType.value === 'bar' ? '#3b82f6' : 'rgba(59, 130, 246, 0.1)'
     })
   }
   
@@ -441,6 +452,18 @@ const chartData = computed(() => {
 
 const topCategoryTrends = computed(() => {
   return categoryTrends.value.slice(0, 5)
+})
+
+const currentChartComponent = computed(() => {
+  switch (chartType.value) {
+    case 'step':
+      return StepLineChart
+    case 'bar':
+      return FinancialBarChart
+    case 'line':
+    default:
+      return TrendLineChart
+  }
 })
 
 // Methods

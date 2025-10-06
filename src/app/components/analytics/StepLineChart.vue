@@ -41,10 +41,31 @@ const props = defineProps({
   height: {
     type: Number,
     default: 300
+  },
+  fillArea: {
+    type: Boolean,
+    default: false
   }
 })
 
-const chartData = computed(() => props.data)
+const chartData = computed(() => {
+  // Transform data to use stepped interpolation
+  const transformedData = { ...props.data }
+  if (transformedData.datasets) {
+    transformedData.datasets = transformedData.datasets.map(dataset => ({
+      ...dataset,
+      stepped: 'before', // Step line interpolation
+      tension: 0,
+      fill: props.fillArea ? 'origin' : false,
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      pointBackgroundColor: 'white',
+      pointBorderWidth: 2
+    }))
+  }
+  return transformedData
+})
 
 const chartOptions = {
   responsive: true,
@@ -52,18 +73,6 @@ const chartOptions = {
   interaction: {
     mode: 'index',
     intersect: false
-  },
-  elements: {
-    line: {
-      tension: 0, // Straight lines for financial data
-      borderWidth: 2
-    },
-    point: {
-      radius: 4,
-      hoverRadius: 6,
-      backgroundColor: 'white',
-      borderWidth: 2
-    }
   },
   plugins: {
     legend: {
@@ -105,3 +114,10 @@ const chartOptions = {
   }
 }
 </script>
+
+<style scoped>
+.chart-container {
+  position: relative;
+  width: 100%;
+}
+</style>

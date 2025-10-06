@@ -304,8 +304,12 @@ export default async function analyticsRoutes(fastify, options) {
         const { period = 'month', startDate, endDate, category, merchant, accountId } = request.query;
 
         try {
+            // Validate period parameter to prevent SQL injection
+            const validPeriods = ['day', 'week', 'month', 'year'];
+            const sanitizedPeriod = validPeriods.includes(period) ? period : 'month';
+            
             let dateFormat;
-            switch (period) {
+            switch (sanitizedPeriod) {
                 case 'day':
                     dateFormat = 'YYYY-MM-DD';
                     break;
@@ -393,19 +397,44 @@ export default async function analyticsRoutes(fastify, options) {
                     WHERE user_id = $1
                 `;
                 
-                const detailParams = [...params];
+                const detailParams = [userId];
+                let detailParamCount = 2;
                 
-                // Add the same date and category filters
-                if (params.length > 1) {
-                    for (let i = 2; i <= params.length; i++) {
-                        if (i === 2 && (startDate || (!startDate && !endDate))) {
-                            detailQuery += ` AND transaction_date >= $${i}`;
-                        } else if ((i === 3 && endDate) || (i === 2 && endDate && !startDate)) {
-                            detailQuery += ` AND transaction_date <= $${i}`;
-                        } else if (category && params[i-1] === category) {
-                            detailQuery += ` AND category = $${i}`;
-                        }
+                // Rebuild the same filters as the main query
+                // Add account filter if specified (not 'all')
+                if (accountId && accountId !== 'all') {
+                    detailQuery += ` AND account_id = $${detailParamCount}`;
+                    detailParams.push(accountId);
+                    detailParamCount++;
+                }
+                
+                // Add date filters
+                if (!startDate && !endDate) {
+                    // Default to last 6 months
+                    const sixMonthsAgo = new Date();
+                    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+                    detailQuery += ` AND transaction_date >= $${detailParamCount}`;
+                    detailParams.push(sixMonthsAgo.toISOString().split('T')[0]);
+                    detailParamCount++;
+                } else {
+                    if (startDate) {
+                        detailQuery += ` AND transaction_date >= $${detailParamCount}`;
+                        detailParams.push(startDate);
+                        detailParamCount++;
                     }
+                    
+                    if (endDate) {
+                        detailQuery += ` AND transaction_date <= $${detailParamCount}`;
+                        detailParams.push(endDate);
+                        detailParamCount++;
+                    }
+                }
+                
+                // Add category filter if provided
+                if (category) {
+                    detailQuery += ` AND category = $${detailParamCount}`;
+                    detailParams.push(category);
+                    detailParamCount++;
                 }
                 
                 detailQuery += ` ORDER BY transaction_date`;
@@ -481,7 +510,7 @@ export default async function analyticsRoutes(fastify, options) {
             })();
             const actualEndDate = endDate ? new Date(endDate) : new Date();
 
-            if (period === 'month') {
+            if (sanitizedPeriod === 'month') {
                 const current = new Date(actualStartDate);
                 current.setDate(1); // Start from beginning of month
                 
@@ -512,7 +541,7 @@ export default async function analyticsRoutes(fastify, options) {
             return {
                 success: true,
                 data: {
-                    period,
+                    period: sanitizedPeriod,
                     trends
                 }
             };

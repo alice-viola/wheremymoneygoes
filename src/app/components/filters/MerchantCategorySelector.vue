@@ -38,15 +38,13 @@
       </label>
       <div class="relative">
         <!-- Combobox for merchants with search -->
-        <Combobox v-model="localMerchant" :disabled="disabled">
-          <div class="relative" ref="merchantInputRef">
+        <Combobox v-model="localMerchant" :disabled="disabled" v-slot="{ open }">
+          <div class="relative" ref="merchantInputRef" :data-open="open">
             <ComboboxInput
               :id="`merchant-${uid}`"
               class="w-full px-4 py-2.5 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
               :displayValue="(merchant) => merchant?.name || merchant || ''"
               @change="merchantQuery = $event.target.value"
-              @focus="handleMerchantFocus"
-              @blur="handleMerchantBlur"
               :placeholder="merchantPlaceholder"
             />
             <ComboboxButton class="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -62,10 +60,9 @@
               @after-leave="merchantQuery = ''"
             >
               <ComboboxOptions 
-                v-if="showMerchantDropdown"
-                class="fixed max-h-60 overflow-auto rounded-lg bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
-                :style="merchantDropdownStyle"
-            >
+                class="fixed max-h-60 w-[var(--button-width)] overflow-auto rounded-lg bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                :style="dropdownStyle"
+              >
               <!-- Loading state -->
               <div v-if="loadingMerchants" class="px-4 py-3 text-center">
                 <div class="inline-flex items-center space-x-2">
@@ -244,8 +241,7 @@ const loadingMerchants = ref(false)
 const merchants = ref([])
 const uid = ref(Math.random().toString(36).substr(2, 9))
 const merchantInputRef = ref(null)
-const showMerchantDropdown = ref(false)
-const merchantDropdownStyle = ref({})
+const dropdownStyle = ref({})
 
 // Add emoji to categories
 const categories = computed(() => {
@@ -296,72 +292,48 @@ const handleCategoryChange = () => {
   }
 }
 
-const handleMerchantFocus = () => {
-  showMerchantDropdown.value = true
+
+const updateDropdownPosition = (isOpen) => {
+  if (!isOpen || !merchantInputRef.value) return
+  
   nextTick(() => {
-    updateMerchantDropdownPosition()
-  })
-}
-
-const handleMerchantBlur = () => {
-  // Delay to allow click on dropdown items
-  setTimeout(() => {
-    showMerchantDropdown.value = false
-  }, 200)
-}
-
-const updateMerchantDropdownPosition = () => {
-  if (!merchantInputRef.value) return
-  
-  const inputRect = merchantInputRef.value.getBoundingClientRect()
-  const dropdownWidth = inputRect.width
-  const dropdownMaxHeight = 240 // max-h-60 = 15rem = 240px
-  
-  let top = inputRect.bottom + 4
-  let left = inputRect.left
-  
-  // Check if dropdown would go off the bottom
-  if (top + dropdownMaxHeight > window.innerHeight - 20) {
-    // Position above the input if there's more space
-    const spaceAbove = inputRect.top
-    const spaceBelow = window.innerHeight - inputRect.bottom
+    if (!merchantInputRef.value) return
     
-    if (spaceAbove > spaceBelow && spaceAbove > dropdownMaxHeight + 20) {
-      top = inputRect.top - dropdownMaxHeight - 4
-    } else {
-      // Keep below but limit height
-      const availableHeight = window.innerHeight - top - 20
-      merchantDropdownStyle.value = {
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${dropdownWidth}px`,
-        maxHeight: `${Math.min(dropdownMaxHeight, availableHeight)}px`
+    const inputRect = merchantInputRef.value.getBoundingClientRect()
+    const dropdownWidth = inputRect.width
+    const dropdownMaxHeight = 240 // max-h-60 = 15rem = 240px
+    
+    let top = inputRect.bottom + 4
+    let left = inputRect.left
+    
+    // Check if dropdown would go off the bottom
+    if (top + dropdownMaxHeight > window.innerHeight - 20) {
+      // Position above the input if there's more space
+      const spaceAbove = inputRect.top
+      const spaceBelow = window.innerHeight - inputRect.bottom
+      
+      if (spaceAbove > spaceBelow && spaceAbove > dropdownMaxHeight + 20) {
+        top = inputRect.top - dropdownMaxHeight - 4
       }
-      return
     }
-  }
-  
-  // Check if dropdown would go off the right edge
-  if (left + dropdownWidth > window.innerWidth - 20) {
-    left = window.innerWidth - dropdownWidth - 20
-  }
-  
-  // Ensure minimum distance from edges
-  left = Math.max(10, left)
-  top = Math.max(10, top)
-  
-  merchantDropdownStyle.value = {
-    top: `${top}px`,
-    left: `${left}px`,
-    width: `${dropdownWidth}px`,
-    maxHeight: `${dropdownMaxHeight}px`
-  }
-}
-
-const handleResize = () => {
-  if (showMerchantDropdown.value) {
-    updateMerchantDropdownPosition()
-  }
+    
+    // Check if dropdown would go off the right edge
+    if (left + dropdownWidth > window.innerWidth - 20) {
+      left = window.innerWidth - dropdownWidth - 20
+    }
+    
+    // Ensure minimum distance from edges
+    left = Math.max(10, left)
+    top = Math.max(10, top)
+    
+    dropdownStyle.value = {
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${dropdownWidth}px`,
+      maxHeight: `${dropdownMaxHeight}px`,
+      zIndex: 9999
+    }
+  })
 }
 
 const handleClearAll = () => {
@@ -435,14 +407,52 @@ const getCategoryEmoji = (category) => {
   return emojiMap[category] || '📌'
 }
 
+// Watch for dropdown open state changes
+const observeDropdown = () => {
+  if (!merchantInputRef.value) return
+  
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'data-open') {
+        const isOpen = merchantInputRef.value.getAttribute('data-open') === 'true'
+        if (isOpen) {
+          updateDropdownPosition(true)
+        }
+      }
+    })
+  })
+  
+  observer.observe(merchantInputRef.value, {
+    attributes: true,
+    attributeFilter: ['data-open']
+  })
+  
+  return observer
+}
+
+let dropdownObserver = null
+
+// Handle window resize and scroll
+const handleResize = () => {
+  if (merchantInputRef.value?.getAttribute('data-open') === 'true') {
+    updateDropdownPosition(true)
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   loadMerchants()
+  nextTick(() => {
+    dropdownObserver = observeDropdown()
+  })
   window.addEventListener('resize', handleResize)
   window.addEventListener('scroll', handleResize, true)
 })
 
 onUnmounted(() => {
+  if (dropdownObserver) {
+    dropdownObserver.disconnect()
+  }
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('scroll', handleResize, true)
 })

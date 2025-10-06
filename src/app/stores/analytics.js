@@ -54,14 +54,14 @@ export const useAnalyticsStore = defineStore('analytics', {
             data: state.trends.map(t => t.expenses),
             borderColor: '#ef4444',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            tension: 0.4
+            tension: 0
           },
           {
             label: 'Income',
             data: state.trends.map(t => t.income),
             borderColor: '#22c55e',
             backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            tension: 0.4
+            tension: 0
           }
         ]
       }

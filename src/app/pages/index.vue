@@ -111,10 +111,11 @@
             View details →
           </router-link>
         </div>
-        <TrendLineChart
+        <StepLineChart
           v-if="trendChartData"
           :data="trendChartData"
           :height="320"
+          :fillArea="true"
         />
         <div v-else class="h-[320px] flex flex-col items-center justify-center text-gray-400">
           <ArrowTrendingUpIcon class="w-12 h-12 mb-3 opacity-20" />
@@ -179,6 +180,7 @@ import { formatCurrency, formatNumber } from '@/utils/formatters'
 import SummaryCard from '@/components/analytics/SummaryCard.vue'
 import CategoryPieChart from '@/components/analytics/CategoryPieChart.vue'
 import TrendLineChart from '@/components/analytics/TrendLineChart.vue'
+import StepLineChart from '@/components/analytics/StepLineChart.vue'
 import RecentTransactions from '@/components/transactions/RecentTransactions.vue'
 import TopMerchantsList from '@/components/analytics/TopMerchantsList.vue'
 import { 
