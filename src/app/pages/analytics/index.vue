@@ -308,7 +308,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useAnalyticsStore } from '@/stores/analytics'
 import { formatCurrency, getCategoryColor } from '@/utils/formatters'
@@ -420,7 +420,21 @@ const fetchData = async () => {
   }
 }
 
+// Handle account changes
+const handleAccountChange = async (event) => {
+  console.log('Account changed in analytics page to:', event.detail.accountId)
+  await fetchData()
+}
+
 onMounted(() => {
   fetchData()
+  
+  // Listen for account changes
+  window.addEventListener('account-changed', handleAccountChange)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('account-changed', handleAccountChange)
 })
 </script>

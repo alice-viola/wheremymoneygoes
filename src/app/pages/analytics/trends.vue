@@ -316,7 +316,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useAnalyticsStore } from '@/stores/analytics'
 import { formatCurrency, formatDate, getCategoryColor } from '@/utils/formatters'
@@ -658,6 +658,12 @@ const fetchMerchants = async () => {
   }
 }
 
+// Handle account changes
+const handleAccountChange = async (event) => {
+  console.log('Account changed in trends page to:', event.detail.accountId)
+  await fetchData()
+}
+
 onMounted(async () => {
   // Load saved filters first
   loadFiltersFromStorage()
@@ -667,5 +673,13 @@ onMounted(async () => {
     fetchCategories(),
     fetchMerchants()
   ])
+  
+  // Listen for account changes
+  window.addEventListener('account-changed', handleAccountChange)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('account-changed', handleAccountChange)
 })
 </script>

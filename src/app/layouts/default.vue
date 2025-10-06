@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Header -->
-    <AppHeader />
+    <AppHeader @toggle-sidebar="sidebarOpen = !sidebarOpen" />
     
     <!-- Sidebar -->
     <AppSidebar :open="sidebarOpen" @close="sidebarOpen = false" @toggle="sidebarOpen = !sidebarOpen" />
@@ -27,12 +27,34 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import AppHeader from '../components/common/AppHeader.vue'
 import AppSidebar from '../components/common/AppSidebar.vue'
 import ChatPanel from '../components/assistant/ChatPanel.vue'
 import { useAssistantStore } from '../stores/assistant'
 
+// Check if we're on mobile and set sidebar state accordingly
 const sidebarOpen = ref(true)
 const assistantStore = useAssistantStore()
+
+onMounted(() => {
+  // Close sidebar by default on mobile
+  if (window.innerWidth < 1024) {
+    sidebarOpen.value = false
+  }
+  
+  // Listen for window resize to handle responsive behavior
+  const handleResize = () => {
+    if (window.innerWidth < 1024) {
+      sidebarOpen.value = false
+    }
+  }
+  
+  window.addEventListener('resize', handleResize)
+  
+  // Cleanup
+  return () => {
+    window.removeEventListener('resize', handleResize)
+  }
+})
 </script>

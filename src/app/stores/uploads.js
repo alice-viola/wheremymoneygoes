@@ -37,7 +37,7 @@ export const useUploadsStore = defineStore('uploads', {
       }
     },
     
-    async uploadFile(file, userId) {
+    async uploadFile(file, accountId = null) {
       this.isUploading = true
       this.uploadProgress = {
         phase: 'uploading',
@@ -47,14 +47,16 @@ export const useUploadsStore = defineStore('uploads', {
         message: 'Uploading file...'
       }
       
-      // Get selected account from accounts store
-      const accountsStore = useAccountsStore()
-      const accountId = accountsStore.selectedAccountId === 'all' 
-        ? accountsStore.defaultAccountId 
-        : accountsStore.selectedAccountId
+      // If no accountId provided, get from accounts store
+      if (!accountId) {
+        const accountsStore = useAccountsStore()
+        accountId = accountsStore.selectedAccountId === 'all' 
+          ? accountsStore.defaultAccountId 
+          : accountsStore.selectedAccountId
+      }
       
       try {
-        const response = await uploadsApi.uploadFile(file, userId, accountId)
+        const response = await uploadsApi.uploadFile(file, accountId)
         this.currentUpload = response.data  // response is already unwrapped
         this.uploads.unshift(response.data)
         return response.data

@@ -99,6 +99,13 @@ import { useToast } from 'vue-toastification'
 import { formatFileSize } from '@/utils/formatters'
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from '@/utils/constants'
 
+const props = defineProps({
+  selectedAccount: {
+    type: String,
+    default: null
+  }
+})
+
 const emit = defineEmits(['file-selected', 'upload-start'])
 
 const toast = useToast()
@@ -174,6 +181,7 @@ const clearFile = () => {
 // Expose methods for parent component
 defineExpose({
   clearFile,
+  reset: clearFile,  // Alias for compatibility
   setUploading: (value) => { isUploading.value = value }
 })
 </script>

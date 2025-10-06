@@ -3,8 +3,19 @@
     <div class="flex items-center justify-between h-16">
       <!-- Left side -->
       <div class="flex items-center">
+        <!-- Mobile Menu Toggle -->
+        <button
+          @click="$emit('toggle-sidebar')"
+          class="lg:hidden ml-4 p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-lg transition-all duration-200"
+          aria-label="Toggle sidebar"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        
         <!-- Logo -->
-        <div class="flex items-center ml-6">
+        <div class="flex items-center ml-2 lg:ml-6">
           <!-- Animated gradient logo -->
           <div class="relative">
             <div class="absolute inset-0 bg-gradient-to-r from-primary-600 to-accent-600 rounded-xl blur-lg opacity-50 animate-pulse"></div>
@@ -14,7 +25,8 @@
               </svg>
             </div>
           </div>
-          <div class="ml-3">
+          <!-- Title and subtitle - hidden on mobile -->
+          <div class="ml-3 hidden sm:block">
             <h1 class="text-lg font-display font-medium gradient-text">
               WhereMyMoneyGoes
             </h1>
@@ -24,13 +36,13 @@
       </div>
       
       <!-- Right side -->
-      <div class="flex items-center space-x-3 px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center space-x-2 sm:space-x-3 px-2 sm:px-4 md:px-6 lg:px-8">
         <!-- Quick Actions -->
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-1 sm:space-x-2">
           <!-- Account Selector -->
           <AccountSelector />
           
-          <div class="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+          <div class="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
           
           <!-- AI Assistant Button -->
           <button
@@ -46,7 +58,7 @@
             <span class="absolute top-0 right-0 w-2 h-2 bg-gradient-to-r from-primary-600 to-accent-600 rounded-full animate-pulse"></span>
           </button>
           
-          <div class="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+          <div class="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
           
           <!-- Notifications -->
           <NotificationBell />
@@ -65,7 +77,7 @@ import UserMenu from './UserMenu.vue'
 import AccountSelector from './AccountSelector.vue'
 import { useAssistantStore } from '../../stores/assistant'
 
-// No emits needed
+defineEmits(['toggle-sidebar'])
 
 const assistantStore = useAssistantStore()
 

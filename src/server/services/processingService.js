@@ -31,6 +31,11 @@ class ProcessingService {
         });
 
         try {
+            // Get account_id from upload record
+            const uploadQuery = `SELECT account_id FROM wheremymoneygoes.uploads WHERE id = $1`;
+            const uploadResult = await pool.query(uploadQuery, [uploadId]);
+            const accountId = uploadResult.rows[0]?.account_id || null;
+            
             // Update upload status
             await this.updateUploadStatus(uploadId, 'processing');
             
@@ -38,7 +43,7 @@ class ProcessingService {
             websocketService.sendToUser(userId, 'processing:started', { uploadId });
 
             // Process in steps
-            await this.processUpload(uploadId, userId);
+            await this.processUpload(uploadId, userId, accountId);
             
             // Mark as completed
             await this.updateUploadStatus(uploadId, 'completed', { completed_at: new Date() });
@@ -70,8 +75,9 @@ class ProcessingService {
      * Process upload through all stages
      * @param {string} uploadId 
      * @param {string} userId 
+     * @param {string} accountId
      */
-    async processUpload(uploadId, userId) {
+    async processUpload(uploadId, userId, accountId) {
         // Step 1: Detect separator
         const separator = await this.detectSeparator(uploadId, userId);
         
@@ -79,7 +85,7 @@ class ProcessingService {
         const fieldMappings = await this.detectMappings(uploadId, userId, separator);
         
         // Step 3: Process batches
-        await this.processBatches(uploadId, userId, separator, fieldMappings);
+        await this.processBatches(uploadId, userId, accountId, separator, fieldMappings);
     }
 
     /**
@@ -176,10 +182,11 @@ class ProcessingService {
      * Process batches of CSV lines
      * @param {string} uploadId 
      * @param {string} userId 
+     * @param {string} accountId
      * @param {string} separator 
      * @param {object} fieldMappings 
      */
-    async processBatches(uploadId, userId, separator, fieldMappings) {
+    async processBatches(uploadId, userId, accountId, separator, fieldMappings) {
         const batchSize = config.processingBatchSize;
         let processedCount = 0;
         let failedCount = 0;
@@ -203,6 +210,7 @@ class ProcessingService {
                 const { processed, failed } = await this.processBatch(
                     lines,
                     userId,
+                    accountId,
                     uploadId,
                     separator,
                     fieldMappings
@@ -235,11 +243,12 @@ class ProcessingService {
      * Process a single batch
      * @param {Array} lines 
      * @param {string} userId 
+     * @param {string} accountId
      * @param {string} uploadId 
      * @param {string} separator 
      * @param {object} fieldMappings 
      */
-    async processBatch(lines, userId, uploadId, separator, fieldMappings) {
+    async processBatch(lines, userId, accountId, uploadId, separator, fieldMappings) {
         let processed = 0;
         let failed = 0;
 
@@ -282,7 +291,7 @@ class ProcessingService {
         const transformedRows = transformAllRows(parsedRows, fieldMappings);
 
         // Categorize transactions
-        const merchantCache = await this.getUserMerchantCache(userId);
+        const merchantCache = await this.getUserMerchantCache(userId, accountId);
         const categorizationResult = await categorizeExpenses(transformedRows, {
             batchSize: 50,
             parallelBatches: 5,
@@ -293,12 +302,13 @@ class ProcessingService {
         await this.saveTransactions(
             categorizationResult.transactions,
             userId,
+            accountId,
             uploadId,
             lineIds
         );
 
         // Update merchant cache
-        await this.updateUserMerchantCache(userId, categorizationResult.merchantCache);
+        await this.updateUserMerchantCache(userId, accountId, categorizationResult.merchantCache);
 
         // Mark lines as processed
         await this.markLinesProcessed(lineIds);
@@ -312,13 +322,15 @@ class ProcessingService {
      * Compute a hash for a transaction to detect duplicates
      * @param {Object} tx - Transaction object
      * @param {string} userId - User ID
+     * @param {string} accountId - Account ID
      * @returns {string} SHA256 hash
      */
-    computeTransactionHash(tx, userId) {
+    computeTransactionHash(tx, userId, accountId) {
         // Create a unique string from transaction fields that identify it uniquely
-        // We use: userId, date, amount, currency, kind, and description
+        // We use: userId, accountId, date, amount, currency, kind, and description
         const hashInput = [
             userId,
+            accountId || 'default', // Use 'default' if no accountId to maintain backward compatibility
             tx.Date,
             tx.Amount.toString(),
             tx.Currency,
@@ -333,10 +345,11 @@ class ProcessingService {
      * Save transactions to database
      * @param {Array} transactions 
      * @param {string} userId 
+     * @param {string} accountId
      * @param {string} uploadId 
      * @param {Array} lineIds 
      */
-    async saveTransactions(transactions, userId, uploadId, lineIds) {
+    async saveTransactions(transactions, userId, accountId, uploadId, lineIds) {
         if (!transactions || transactions.length === 0) {
             console.warn('No transactions to save');
             return;
@@ -357,7 +370,7 @@ class ProcessingService {
             }
             
             // Compute transaction hash for duplicate detection
-            const transactionHash = this.computeTransactionHash(tx, userId);
+            const transactionHash = this.computeTransactionHash(tx, userId, accountId);
             
             // Prepare encrypted data
             const encryptedData = encryptionService.encryptJSON({
@@ -377,11 +390,11 @@ class ProcessingService {
                 // Use INSERT ... ON CONFLICT to handle duplicates
                 const query = `
                     INSERT INTO wheremymoneygoes.transactions (
-                        id, user_id, upload_id, raw_line_id, transaction_date,
+                        id, user_id, account_id, upload_id, raw_line_id, transaction_date,
                         transaction_month, transaction_year, kind, amount, currency, 
                         category, encrypted_data, confidence, transaction_hash
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                     ON CONFLICT (user_id, transaction_hash) DO NOTHING
                     RETURNING id
                 `;
@@ -389,6 +402,7 @@ class ProcessingService {
                 const result = await pool.query(query, [
                     uuidv4(),
                     userId,
+                    accountId,
                     uploadId,
                     lineIds[index] || null,
                     tx.Date,
@@ -547,15 +561,16 @@ class ProcessingService {
     /**
      * Get user merchant cache
      * @param {string} userId 
+     * @param {string} accountId
      */
-    async getUserMerchantCache(userId) {
+    async getUserMerchantCache(userId, accountId) {
         const query = `
             SELECT merchant_key, category, encrypted_data, confidence
             FROM wheremymoneygoes.merchant_cache
-            WHERE user_id = $1
+            WHERE user_id = $1 AND account_id = $2
         `;
 
-        const result = await pool.query(query, [userId]);
+        const result = await pool.query(query, [userId, accountId]);
         const cache = new Map();
 
         for (const row of result.rows) {
@@ -584,9 +599,10 @@ class ProcessingService {
     /**
      * Update user merchant cache
      * @param {string} userId 
+     * @param {string} accountId
      * @param {Map} merchantCache 
      */
-    async updateUserMerchantCache(userId, merchantCache) {
+    async updateUserMerchantCache(userId, accountId, merchantCache) {
         if (!merchantCache || merchantCache.size === 0) return;
 
         for (const [key, data] of merchantCache) {
@@ -599,11 +615,11 @@ class ProcessingService {
 
             const query = `
                 INSERT INTO wheremymoneygoes.merchant_cache (
-                    id, user_id, merchant_key, category, encrypted_data, 
+                    id, user_id, account_id, merchant_key, category, encrypted_data, 
                     confidence, usage_count, last_used
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, 1, NOW())
-                ON CONFLICT (user_id, merchant_key) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 1, NOW())
+                ON CONFLICT (user_id, account_id, merchant_key) 
                 DO UPDATE SET
                     category = EXCLUDED.category,
                     encrypted_data = EXCLUDED.encrypted_data,
@@ -616,6 +632,7 @@ class ProcessingService {
             await pool.query(query, [
                 uuidv4(),
                 userId,
+                accountId,
                 JSON.stringify(encryptedKey),
                 data.category,
                 JSON.stringify(encryptedData),

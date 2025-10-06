@@ -307,7 +307,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronUpDownIcon } from '@heroicons/vue/24/outline'
 import { useUserStore } from '@/stores/user'
@@ -463,7 +463,21 @@ const viewMerchantDetails = (merchant) => {
   })
 }
 
+// Handle account changes
+const handleAccountChange = async (event) => {
+  console.log('Account changed in merchants page to:', event.detail.accountId)
+  await fetchData()
+}
+
 onMounted(() => {
   fetchData()
+  
+  // Listen for account changes
+  window.addEventListener('account-changed', handleAccountChange)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('account-changed', handleAccountChange)
 })
 </script>

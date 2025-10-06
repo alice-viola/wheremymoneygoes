@@ -2,7 +2,7 @@
   <div class="relative">
     <!-- Selector Button -->
     <button
-      @click="isOpen = !isOpen"
+      @click="handleDropdownToggle"
       class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
       <div
@@ -32,7 +32,7 @@
     >
       <div
         v-if="isOpen"
-        class="absolute z-50 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+        class="absolute z-50 mt-2 w-72 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
       >
         <!-- All Accounts Option -->
         <button
@@ -60,9 +60,29 @@
         <div class="border-t border-gray-200 dark:border-gray-700"></div>
 
         <!-- Individual Accounts -->
-        <div class="max-h-96 overflow-y-auto">
+        <div v-if="isLoadingAccounts" class="p-4 text-center">
+          <div class="inline-flex items-center">
+            <svg class="animate-spin h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="ml-2 text-sm text-gray-500">Loading accounts...</span>
+          </div>
+        </div>
+        <div v-else-if="availableAccounts.length === 0" class="p-4 text-center">
+          <p class="text-sm text-gray-500 dark:text-gray-400">No accounts found</p>
+          <router-link
+            to="/settings/accounts"
+            @click="isOpen = false"
+            class="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+          >
+            <PlusIcon class="w-4 h-4" />
+            Create your first account
+          </router-link>
+        </div>
+        <div v-else class="max-h-96 overflow-y-auto">
           <button
-            v-for="account in accountsStore.activeAccounts"
+            v-for="account in availableAccounts"
             :key="account.id"
             @click="selectAccount(account.id)"
             class="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -134,29 +154,73 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { useUserStore } from '@/stores/user'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from 'vue-toastification'
 import { 
   ChevronDownIcon, 
   CheckIcon, 
   ViewColumnsIcon,
-  CogIcon 
+  CogIcon,
+  PlusIcon 
 } from '@heroicons/vue/24/outline'
+
+const emit = defineEmits(['account-changed'])
 
 const accountsStore = useAccountsStore()
 const userStore = useUserStore()
 const authStore = useAuthStore()
+const toast = useToast()
 
 const isOpen = ref(false)
 const hasLoadedAccounts = ref(false)
+const isLoadingAccounts = ref(false)
 
 const selectedAccount = computed(() => accountsStore.selectedAccount)
 
-const selectAccount = (accountId) => {
-  accountsStore.selectAccount(accountId)
+// Use all accounts if no active accounts are available
+const availableAccounts = computed(() => {
+  const active = accountsStore.activeAccounts
+  if (active && active.length > 0) {
+    return active
+  }
+  // Fall back to all accounts if no active accounts
+  return accountsStore.accounts
+})
+
+const selectAccount = async (accountId) => {
   isOpen.value = false
+  // Show loading state while data refreshes
+  const loadingToast = toast?.info?.('Switching account...', { 
+    timeout: false,
+    closeOnClick: false 
+  })
+  
+  try {
+    await accountsStore.selectAccount(accountId)
+    emit('account-changed', accountId)
+    if (loadingToast) {
+      toast.dismiss(loadingToast)
+      // Success notification removed - switching happens silently
+    }
+  } catch (error) {
+    console.error('Failed to switch account:', error)
+    if (loadingToast) {
+      toast.dismiss(loadingToast)
+      toast.error('Failed to switch account')
+    }
+  }
 }
 
-const loadAccounts = async () => {
-  if (!hasLoadedAccounts.value && authStore.isAuthenticated && authStore.user?.id) {
+// Load accounts when dropdown opens if not loaded
+const handleDropdownToggle = async () => {
+  isOpen.value = !isOpen.value
+  if (isOpen.value && !hasLoadedAccounts.value) {
+    await loadAccounts()
+  }
+}
+
+const loadAccounts = async (force = false) => {
+  if ((!hasLoadedAccounts.value || force) && authStore.isAuthenticated && authStore.user?.id) {
+    isLoadingAccounts.value = true
     try {
       await accountsStore.fetchAccounts()
       accountsStore.initFromStorage()
@@ -175,6 +239,8 @@ const loadAccounts = async () => {
           }
         }, 1000)
       }
+    } finally {
+      isLoadingAccounts.value = false
     }
   }
 }

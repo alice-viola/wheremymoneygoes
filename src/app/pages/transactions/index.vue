@@ -380,7 +380,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUserStore } from '@/stores/user'
@@ -684,6 +684,17 @@ const loadMerchants = async () => {
   }
 }
 
+// Handle account changes
+const handleAccountChange = async (event) => {
+  console.log('Account changed in transactions page to:', event.detail.accountId)
+  loading.value = true
+  await Promise.all([
+    transactionsStore.fetchTransactions(),
+    loadMerchants()
+  ])
+  loading.value = false
+}
+
 onMounted(async () => {
   // Load saved filters first
   loadFiltersFromStorage()
@@ -695,5 +706,13 @@ onMounted(async () => {
     loadMerchants()
   ])
   loading.value = false
+  
+  // Listen for account changes
+  window.addEventListener('account-changed', handleAccountChange)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('account-changed', handleAccountChange)
 })
 </script>

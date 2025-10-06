@@ -32,9 +32,15 @@ export const useAccountsStore = defineStore('accounts', {
       return state.accounts.find(a => a.id === id)
     },
 
-    // Get active accounts only
+    // Get active accounts only (defaults to all accounts if isActive is not defined)
     activeAccounts: (state) => {
-      return state.accounts.filter(a => a.isActive)
+      // If no accounts have isActive property, return all accounts
+      const hasActiveProperty = state.accounts.some(a => 'isActive' in a)
+      if (!hasActiveProperty) {
+        return state.accounts
+      }
+      // Otherwise filter by isActive
+      return state.accounts.filter(a => a.isActive !== false)
     },
 
     // Get the default account
@@ -85,11 +91,33 @@ export const useAccountsStore = defineStore('accounts', {
     },
 
     // Select an account (or 'all')
-    selectAccount(accountId) {
+    async selectAccount(accountId) {
+      const previousAccountId = this.selectedAccountId
       this.selectedAccountId = accountId
       
       // Store selection in localStorage for persistence
       localStorage.setItem('selectedAccountId', accountId)
+      
+      // Only refresh data if account actually changed
+      if (previousAccountId !== accountId) {
+        // Import other stores to trigger data refresh
+        const { useTransactionsStore } = await import('./transactions')
+        const { useAnalyticsStore } = await import('./analytics')
+        
+        const transactionsStore = useTransactionsStore()
+        const analyticsStore = useAnalyticsStore()
+        
+        // Clear caches and refresh data
+        analyticsStore.clearCache()
+        
+        // Fetch new data for the selected account in parallel
+        await Promise.all([
+          transactionsStore.fetchTransactions().catch(err => console.error('Failed to fetch transactions:', err)),
+          analyticsStore.fetchSummary(null, true).catch(err => console.error('Failed to fetch summary:', err)),
+          analyticsStore.fetchCategories(null, true).catch(err => console.error('Failed to fetch categories:', err)),
+          analyticsStore.fetchTrends(null, true).catch(err => console.error('Failed to fetch trends:', err))
+        ])
+      }
       
       // Emit event for other components to react
       window.dispatchEvent(new CustomEvent('account-changed', { 

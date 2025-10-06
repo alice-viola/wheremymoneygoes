@@ -274,7 +274,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAnalyticsStore } from '@/stores/analytics'
@@ -410,9 +410,23 @@ const viewCategoryDetails = (category) => {
   })
 }
 
+// Handle account changes
+const handleAccountChange = async (event) => {
+  console.log('Account changed in categories page to:', event.detail.accountId)
+  await fetchData()
+}
+
 onMounted(() => {
   // Load saved filters first
   loadFiltersFromStorage()
   fetchData()
+  
+  // Listen for account changes
+  window.addEventListener('account-changed', handleAccountChange)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('account-changed', handleAccountChange)
 })
 </script>

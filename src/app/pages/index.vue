@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAnalyticsStore } from '@/stores/analytics'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUserStore } from '@/stores/user'
@@ -219,7 +219,7 @@ const expenseTrend = ref({
   label: 'vs last month'
 })
 
-onMounted(async () => {
+const fetchDashboardData = async () => {
   await Promise.all([
     analyticsStore.fetchSummary(),
     analyticsStore.fetchCategories(),
@@ -227,5 +227,24 @@ onMounted(async () => {
     analyticsStore.fetchMerchants({ limit: 5 }),
     transactionsStore.fetchTransactions({ limit: 10 })
   ])
+}
+
+// Handle account changes
+const handleAccountChange = async (event) => {
+  // Data will be automatically refreshed by the accounts store
+  // But we can add additional logic here if needed
+  console.log('Account changed to:', event.detail.accountId)
+}
+
+onMounted(async () => {
+  await fetchDashboardData()
+  
+  // Listen for account changes
+  window.addEventListener('account-changed', handleAccountChange)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('account-changed', handleAccountChange)
 })
 </script>

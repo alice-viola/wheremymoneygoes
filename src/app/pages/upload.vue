@@ -26,11 +26,33 @@
       </div>
     </div>
     
+    <!-- Account Selection Section -->
+    <div v-if="!isProcessing && !processingComplete" class="card p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-medium text-gray-900 dark:text-white">Select Account</h2>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Choose which account this upload should be associated with
+          </p>
+        </div>
+        <AccountSelector ref="accountSelector" @account-changed="handleAccountChanged" />
+      </div>
+      <div v-if="selectedAccountForUpload" class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+        <div class="flex items-center space-x-2">
+          <CheckCircleIcon class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <span class="text-sm text-blue-700 dark:text-blue-300">
+            Uploading to: <strong>{{ selectedAccountName }}</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+    
     <!-- Upload Section -->
     <div v-if="!isProcessing && !processingComplete">
       <!-- Enhanced File Uploader -->
       <FileUploader
         ref="fileUploader"
+        :selected-account="selectedAccountForUpload"
         @file-selected="handleFileSelected"
         @upload-start="handleUploadStart"
       />
@@ -124,6 +146,7 @@ import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useUserStore } from '@/stores/user'
 import { useUploadsStore } from '@/stores/uploads'
+import { useAccountsStore } from '@/stores/accounts'
 import { useAppStore } from '@/stores/app'
 import wsService from '@/services/websocket'
 import { WS_EVENTS, TEST_USER_ID } from '@/utils/constants'
@@ -133,29 +156,42 @@ import {
   ShieldCheckIcon,
   BoltIcon,
   ChartBarIcon,
-  XMarkIcon
+  XMarkIcon,
+  CheckCircleIcon
 } from '@heroicons/vue/24/outline'
 
 import FileUploader from '@/components/upload/FileUploader.vue'
 import UploadProgress from '@/components/upload/UploadProgress.vue'
 import UploadHistory from '@/components/upload/UploadHistory.vue'
 import ProcessingComplete from '@/components/upload/ProcessingComplete.vue'
+import AccountSelector from '@/components/common/AccountSelector.vue'
 
 const router = useRouter()
 const toast = useToast()
 const userStore = useUserStore()
 const uploadsStore = useUploadsStore()
+const accountsStore = useAccountsStore()
 const appStore = useAppStore()
 
 const fileUploader = ref(null)
+const accountSelector = ref(null)
 const uploadProgress = ref(null)
 const selectedFile = ref(null)
+const selectedAccountForUpload = ref(null)
 const isProcessing = ref(false)
 const processingComplete = ref(false)
 const completionStats = ref(null)
 
 const recentUploads = computed(() => uploadsStore.recentUploads)
 const uploadProgressData = computed(() => uploadsStore.uploadProgress)
+const selectedAccountName = computed(() => {
+  if (!selectedAccountForUpload.value) return ''
+  if (selectedAccountForUpload.value === 'all') {
+    return accountsStore.defaultAccount?.accountName || 'Default Account'
+  }
+  const account = accountsStore.accountById(selectedAccountForUpload.value)
+  return account?.accountName || 'Unknown Account'
+})
 
 // WebSocket event handlers
 const wsHandlers = {
@@ -239,16 +275,36 @@ const handleFileSelected = (file) => {
   selectedFile.value = file
 }
 
+const handleAccountChanged = (accountId) => {
+  selectedAccountForUpload.value = accountId
+}
+
 const handleUploadStart = async () => {
   if (!selectedFile.value) return
+  
+  // Check if account is selected
+  if (!selectedAccountForUpload.value) {
+    toast.warning('Please select an account for this upload')
+    return
+  }
   
   isProcessing.value = true
   processingComplete.value = false
   completionStats.value = null
   
   try {
-    const userId = userStore.userId || TEST_USER_ID
-    await uploadsStore.uploadFile(selectedFile.value, userId)
+    // Determine the actual account ID to use
+    let accountIdToUse = selectedAccountForUpload.value
+    if (accountIdToUse === 'all') {
+      accountIdToUse = accountsStore.defaultAccountId
+      if (!accountIdToUse) {
+        toast.error('No default account found. Please create an account first.')
+        isProcessing.value = false
+        return
+      }
+    }
+    
+    await uploadsStore.uploadFile(selectedFile.value, accountIdToUse)
   } catch (error) {
     console.error('Upload error:', error)
     isProcessing.value = false
@@ -301,7 +357,7 @@ const handleDelete = async (uploadId) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Register WebSocket handlers
   Object.entries(wsHandlers).forEach(([event, handler]) => {
     wsService.on(event, handler)
@@ -310,6 +366,10 @@ onMounted(() => {
   // Load recent uploads
   const userId = userStore.userId || 'default-user'
   uploadsStore.fetchUploads()
+  
+  // Load accounts and set default selection
+  await accountsStore.fetchAccounts()
+  selectedAccountForUpload.value = accountsStore.selectedAccountId
   
   // Connect WebSocket if not connected
   if (!wsService.isConnected.value) {
